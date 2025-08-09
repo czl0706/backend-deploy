@@ -1,0 +1,11 @@
+services:
+  backend:
+    build: .
+    image: fastapi-app
+    ports: 
+      - 11233:8080
+    environment:
+      APP_RELOAD: "false"
+    volumes:
+      - ./fastapi-app:/app
+    restart: unless-stopped
