@@ -1,0 +1,58 @@
+name: Deploy FastAPI with Docker Compose
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v1.2.2
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.SERVER_PORT }}
+        script: |
+          # Stop execution on any error
+          set -e
+
+          # Check if directory exists, clone if not
+          [ ! -d ~/backend-deploy ] && git clone https://github.com/czl0706/backend-deploy.git
+
+          # Navigate to project directory
+          cd ~/backend-deploy
+          
+          # Pull latest code
+          echo "Pulling latest code..."
+          git pull origin main
+          
+          # Stop and remove existing containers
+          echo "Stopping existing containers..."
+          docker-compose -f docker-compose.dev.yml down || true
+          
+          # Build new image
+          echo "Building new image..."
+          docker build -t fastapi-app .
+          
+          # Start services
+          echo "Starting services..."
+          docker-compose -f docker-compose.dev.yml up -d
+          
+          # Wait for service to start and check health
+          echo "Waiting for service to start..."
+          sleep 10
+          
+          # Check if containers are running properly
+          if docker-compose -f docker-compose.dev.yml ps | grep -q "Up"; then
+            echo "Deployment successful!"
+            # Clean up unused images
+            docker image prune -f
+          else
+            echo "Deployment failed! Containers are not running properly."
+            docker-compose -f docker-compose.dev.yml logs
+            exit 1
+          fi
